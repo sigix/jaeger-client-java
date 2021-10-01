@@ -166,6 +166,10 @@ public class Metrics {
   // Number of spans dropped due to internal queue overflow
   public Counter reporterDropped;
 
+  @Metric(name = "reporter_spans", tags = @Tag(key = "result", value = "muted"))
+  // Number of spans not reported due to not meeting minimum duration
+  public Counter reporterMuted;
+
   @Metric(name = "reporter_queue_length")
   // Current number of spans in the reporter queue
   public Gauge reporterQueueLength;

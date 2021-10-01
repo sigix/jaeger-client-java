@@ -41,9 +41,11 @@ public class RemoteReporter implements Reporter {
 
   public static final int DEFAULT_FLUSH_INTERVAL_MS = 1000;
   public static final int DEFAULT_MAX_QUEUE_SIZE = 100;
+  public static final long DEFAULT_MINIMUM_DURATION = 0;
 
   private final Sender sender;
   private final int closeEnqueueTimeout;
+  private final long minDuration;
 
   @ToString.Exclude private final BlockingQueue<Command> commandQueue;
   @ToString.Exclude private final Timer flushTimer;
@@ -52,10 +54,11 @@ public class RemoteReporter implements Reporter {
   @ToString.Exclude private final Metrics metrics;
 
   private RemoteReporter(Sender sender, int flushInterval, int maxQueueSize, int closeEnqueueTimeout,
-      Metrics metrics) {
+      long minDuration, Metrics metrics) {
     this.sender = sender;
     this.metrics = metrics;
     this.closeEnqueueTimeout = closeEnqueueTimeout;
+    this.minDuration = minDuration;
     commandQueue = new ArrayBlockingQueue<Command>(maxQueueSize);
 
     // start a thread to append spans
@@ -78,6 +81,10 @@ public class RemoteReporter implements Reporter {
 
   @Override
   public void report(JaegerSpan span) {
+    if (span.getDuration() < minDuration) {
+      metrics.reporterMuted.inc(1);
+      return;
+    }
     // Its better to drop spans, than to block here
     boolean added = commandQueue.offer(new AppendCommand(span));
 
@@ -209,6 +216,7 @@ public class RemoteReporter implements Reporter {
     private int flushInterval = DEFAULT_FLUSH_INTERVAL_MS;
     private int maxQueueSize = DEFAULT_MAX_QUEUE_SIZE;
     private int closeEnqueTimeout = DEFAULT_CLOSE_ENQUEUE_TIMEOUT_MILLIS;
+    private long minDuration = DEFAULT_MINIMUM_DURATION;
     private Metrics metrics;
 
     public Builder withFlushInterval(int flushInterval) {
@@ -236,6 +244,11 @@ public class RemoteReporter implements Reporter {
       return this;
     }
 
+    public Builder withMinDuration(long minDuration) {
+      this.minDuration = minDuration;
+      return this;
+    }
+
     public RemoteReporter build() {
       if (sender == null) {
         sender = SenderResolver.resolve();
@@ -243,7 +256,8 @@ public class RemoteReporter implements Reporter {
       if (metrics == null) {
         metrics = new Metrics(new InMemoryMetricsFactory());
       }
-      return new RemoteReporter(sender, flushInterval, maxQueueSize, closeEnqueTimeout, metrics);
+      return new RemoteReporter(sender, flushInterval, maxQueueSize, closeEnqueTimeout, minDuration,
+          metrics);
     }
   }
 }

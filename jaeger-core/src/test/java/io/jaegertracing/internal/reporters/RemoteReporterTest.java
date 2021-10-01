@@ -103,6 +103,42 @@ public class RemoteReporterTest {
   }
 
   @Test
+  public void testRemoteReporterMutesShortSpans() {
+    final long minDuration = 10L;
+    reporter = new RemoteReporter.Builder()
+        .withSender(sender)
+        .withFlushInterval(flushInterval)
+        .withMaxQueueSize(maxQueueSize)
+        .withMinDuration(minDuration)
+        .withMetrics(metrics)
+        .build();
+    tracer = new JaegerTracer.Builder("test-remote-reporter")
+        .withReporter(reporter)
+        .withSampler(new ConstSampler(true))
+        .withMetrics(metrics)
+        .build();
+
+    JaegerSpan span = tracer.buildSpan("fast").start();
+    span.finish(minDuration - 1 + span.getStart());
+    span = tracer.buildSpan("slow").start();
+    span.finish(minDuration + span.getStart());
+
+    // do sleep until automatic flush happens on 'reporter'
+    // added 20ms on top of 'flushInterval' to avoid corner cases
+    await()
+        .with()
+        .pollInterval(1, TimeUnit.MILLISECONDS)
+        .atMost(flushInterval + 20, TimeUnit.MILLISECONDS)
+        .until(() -> sender.getReceived().size() > 0);
+    List<JaegerSpan> received = sender.getReceived();
+
+    assertEquals(1, received.size());
+    assertEquals(1, metricsFactory.getCounter("jaeger_tracer_reporter_spans",
+        "result=muted"));
+
+  }
+
+  @Test
   public void testRemoteReporterFlushesOnClose() {
     int numberOfSpans = 100;
     for (int i = 0; i < numberOfSpans; i++) {

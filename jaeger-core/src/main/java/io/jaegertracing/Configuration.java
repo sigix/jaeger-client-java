@@ -107,6 +107,11 @@ public class Configuration {
   public static final String JAEGER_REPORTER_MAX_QUEUE_SIZE = JAEGER_PREFIX + "REPORTER_MAX_QUEUE_SIZE";
 
   /**
+   * The minimum duration of for a span to be reported.
+   */
+  public static final String JAEGER_REPORTER_MIN_DURATION = JAEGER_PREFIX + "REPORTER_MIN_DURATION";
+
+  /**
    * The flush interval when reporting spans remotely.
    */
   public static final String JAEGER_REPORTER_FLUSH_INTERVAL = JAEGER_PREFIX + "REPORTER_FLUSH_INTERVAL";
@@ -554,6 +559,7 @@ public class Configuration {
     private Boolean logSpans;
     private Integer flushIntervalMs;
     private Integer maxQueueSize;
+    private Long minDuration;
     private SenderConfiguration senderConfiguration = new SenderConfiguration();
 
     public ReporterConfiguration() {
@@ -564,6 +570,7 @@ public class Configuration {
           .withLogSpans(getPropertyAsBool(JAEGER_REPORTER_LOG_SPANS))
           .withFlushInterval(getPropertyAsInt(JAEGER_REPORTER_FLUSH_INTERVAL))
           .withMaxQueueSize(getPropertyAsInt(JAEGER_REPORTER_MAX_QUEUE_SIZE))
+          .withMinDuration(getPropertyAsLong(JAEGER_REPORTER_MIN_DURATION))
           .withSender(SenderConfiguration.fromEnv());
     }
 
@@ -582,6 +589,11 @@ public class Configuration {
       return this;
     }
 
+    public ReporterConfiguration withMinDuration(Long minDuration) {
+      this.minDuration = minDuration;
+      return this;
+    }
+
     public ReporterConfiguration withSender(SenderConfiguration senderConfiguration) {
       this.senderConfiguration = senderConfiguration;
       return this;
@@ -593,6 +605,7 @@ public class Configuration {
           .withSender(senderConfiguration.getSender())
           .withFlushInterval(numberOrDefault(this.flushIntervalMs, RemoteReporter.DEFAULT_FLUSH_INTERVAL_MS).intValue())
           .withMaxQueueSize(numberOrDefault(this.maxQueueSize, RemoteReporter.DEFAULT_MAX_QUEUE_SIZE).intValue())
+          .withMinDuration(numberOrDefault(this.minDuration, RemoteReporter.DEFAULT_MINIMUM_DURATION).longValue())
           .build();
 
       if (Boolean.TRUE.equals(this.logSpans)) {
@@ -738,6 +751,18 @@ public class Configuration {
         return Integer.parseInt(value);
       } catch (NumberFormatException e) {
         log.error("Failed to parse integer for property '" + name + "' with value '" + value + "'", e);
+      }
+    }
+    return null;
+  }
+
+  private static Long getPropertyAsLong(String name) {
+    String value = getProperty(name);
+    if (value != null) {
+      try {
+        return Long.parseLong(value);
+      } catch (NumberFormatException e) {
+        log.error("Failed to parse long for property '" + name + "' with value '" + value + "'", e);
       }
     }
     return null;
