@@ -24,6 +24,7 @@ import io.jaegertracing.internal.propagation.CompositeCodec;
 import io.jaegertracing.internal.propagation.TextMapCodec;
 import io.jaegertracing.internal.propagation.TraceContextCodec;
 import io.jaegertracing.internal.reporters.CompositeReporter;
+import io.jaegertracing.internal.reporters.DeferringReporter;
 import io.jaegertracing.internal.reporters.LoggingReporter;
 import io.jaegertracing.internal.reporters.RemoteReporter;
 import io.jaegertracing.internal.samplers.ConstSampler;
@@ -560,6 +561,7 @@ public class Configuration {
     private Integer flushIntervalMs;
     private Integer maxQueueSize;
     private Long minDuration;
+    private Long deferThreshold;
     private SenderConfiguration senderConfiguration = new SenderConfiguration();
 
     public ReporterConfiguration() {
@@ -594,6 +596,11 @@ public class Configuration {
       return this;
     }
 
+    public ReporterConfiguration withDeferThreshold(Long deferThreshold) {
+      this.deferThreshold = deferThreshold;
+      return this;
+    }
+
     public ReporterConfiguration withSender(SenderConfiguration senderConfiguration) {
       this.senderConfiguration = senderConfiguration;
       return this;
@@ -607,6 +614,10 @@ public class Configuration {
           .withMaxQueueSize(numberOrDefault(this.maxQueueSize, RemoteReporter.DEFAULT_MAX_QUEUE_SIZE).intValue())
           .withMinDuration(numberOrDefault(this.minDuration, RemoteReporter.DEFAULT_MINIMUM_DURATION).longValue())
           .build();
+      final long deferThreshold = numberOrDefault(this.deferThreshold, 0L).longValue();
+      if (deferThreshold > 0) {
+        reporter = new DeferringReporter(reporter, deferThreshold);
+      }
 
       if (Boolean.TRUE.equals(this.logSpans)) {
         Reporter loggingReporter = new LoggingReporter();
