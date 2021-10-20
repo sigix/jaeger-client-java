@@ -569,6 +569,8 @@ public class Configuration {
     private Long deferSpansUnderMicros;
     private SenderConfiguration senderConfiguration = new SenderConfiguration();
 
+    private FilteringReporter.Metrics filteringMetrics = FilteringReporter.NOOP_METRICS;
+
     public ReporterConfiguration() {
     }
 
@@ -612,6 +614,11 @@ public class Configuration {
       return this;
     }
 
+    public ReporterConfiguration withFilteringMetrics(FilteringReporter.Metrics filteringMetrics) {
+      this.filteringMetrics = filteringMetrics;
+      return this;
+    }
+
     private Reporter getReporter(Metrics metrics) {
       Reporter reporter = new RemoteReporter.Builder()
           .withMetrics(metrics)
@@ -624,7 +631,7 @@ public class Configuration {
       final long deferSpansUnderMicros = numberOrDefault(this.deferSpansUnderMicros, FilteringReporter.DEFAULT_DEFER_SPANS_UNDER_MICROS).longValue();
 
       if (filterSpansUnderMicros > 0 || deferSpansUnderMicros > 0) {
-        reporter = new FilteringReporter(reporter, filterSpansUnderMicros, deferSpansUnderMicros);
+        reporter = new FilteringReporter(reporter, filterSpansUnderMicros, deferSpansUnderMicros, this.filteringMetrics);
       }
 
       if (Boolean.TRUE.equals(this.logSpans)) {
