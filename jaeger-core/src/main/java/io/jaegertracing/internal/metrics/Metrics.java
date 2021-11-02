@@ -205,4 +205,18 @@ public class Metrics {
   @Metric(name = "baggage_restrictions_updates", tags = @Tag(key = "result", value = "err"))
   // Number of times baggage restrictions failed to update.
   public Counter baggageRestrictionsUpdateFailure;
+
+  @Metric(name = "filtered_spans")
+  // Number of spans dropped due to short duration.
+  public Counter filteredSpans;
+
+  @Metric(name = "deferred_spans_started")
+  public Counter deferredSpansStarted;
+
+  @Metric(name = "deferred_spans_finished", tags = @Tag(key = "disposition", value = "dropped"))
+  public Counter deferredSpansDropped;
+
+  @Metric(name = "deferred_spans_finished", tags = @Tag(key = "disposition", value = "sent"))
+  public Counter deferredSpansSent;
+
 }
