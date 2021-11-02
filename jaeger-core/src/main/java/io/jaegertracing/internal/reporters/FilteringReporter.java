@@ -108,7 +108,8 @@ public class FilteringReporter implements Reporter {
     }
   }
 
-  private void defer(JaegerSpan span, JaegerSpanContext context, List<JaegerSpan> pendingChildren) {
+  private void defer(final JaegerSpan span, final JaegerSpanContext context,
+      final List<JaegerSpan> pendingChildren) {
     final long parentId = context.getParentId();
     if (parentId != 0) {
       metrics.increment(Gauge.PENDING_SPANS).increment(Counter.DEFERRED_SPANS);
@@ -120,10 +121,8 @@ public class FilteringReporter implements Reporter {
           } else {
             spans = pendingChildren;
           }
-        } else {
-          if (pendingChildren != null) {
-            spans.addAll(pendingChildren);
-          }
+        } else if (pendingChildren != null) {
+          spans.addAll(pendingChildren);
         }
         spans.add(span);
         return spans;
