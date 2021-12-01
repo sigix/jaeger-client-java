@@ -15,11 +15,15 @@
 package io.jaegertracing.internal.reporters;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import io.jaegertracing.internal.JaegerSpan;
 import io.jaegertracing.internal.JaegerSpanContext;
@@ -158,6 +162,79 @@ public class FilteringReporterTest {
     // Then:
     verify(delegate).close();
     assertMetrics(expect().spansPending(0).spansFiltered(0).spansStarted(1).spansDropped(1).spansSent(0));
+  }
+
+  @Test
+  public void testSetOrUpdateParentsPendingSpans_noChildren_firstSibling() {
+    // Given:
+    final boolean hasPendingChildren = false;
+    final List<JaegerSpan> pendingOnThisSpan = null;
+    final List<JaegerSpan> pendingOnParentSpan = null;
+
+    // When:
+    final List<JaegerSpan> spans = FilteringReporter.setOrUpdateParentsPendingSpans(hasPendingChildren,
+        pendingOnThisSpan, pendingOnParentSpan);
+
+    // Then:
+    assertNotNull("A new list was not created", spans);
+    assertTrue("New list should be empty", spans.isEmpty());
+  }
+
+  @Test
+  public void testSetOrUpdateParentsPendingSpans_hasChildren_firstSibling() {
+    // Given:
+    final boolean hasPendingChildren = true;
+    final List<JaegerSpan> pendingOnThisSpan = new ArrayList<>(1);
+    final JaegerSpan pendingChild = mockSpan(10, 1, 1);
+    pendingOnThisSpan.add(pendingChild);
+    final List<JaegerSpan> pendingOnParentSpan = null;
+
+    // When:
+    final List<JaegerSpan> spans = FilteringReporter.setOrUpdateParentsPendingSpans(hasPendingChildren,
+        pendingOnThisSpan, pendingOnParentSpan);
+
+    // Then:
+    assertEquals("Existing pending children list not promoted", pendingOnThisSpan, spans);
+    assertEquals("Pending child not found", pendingChild, spans.get(0));
+  }
+
+  @Test
+  public void testSetOrUpdateParentsPendingSpans_noChildren_laterSibling() {
+    // Given:
+    final boolean hasPendingChildren = false;
+    final List<JaegerSpan> pendingOnThisSpan = null;
+    final List<JaegerSpan> pendingOnParentSpan = new ArrayList<>(1);
+    final JaegerSpan pending = mockSpan(20, 1, 1);
+    pendingOnParentSpan.add(pending);
+
+    // When:
+    final List<JaegerSpan> spans = FilteringReporter.setOrUpdateParentsPendingSpans(hasPendingChildren,
+        pendingOnThisSpan, pendingOnParentSpan);
+
+    // Then:
+    assertEquals("Existing list not reused", pendingOnParentSpan, spans);
+    assertEquals("Pending span not found", pending, spans.get(0));
+  }
+
+  @Test
+  public void testSetOrUpdateParentsPendingSpans_hasChildren_laterSibling() {
+    // Given:
+    final boolean hasPendingChildren = true;
+    final List<JaegerSpan> pendingOnThisSpan = new ArrayList<>(1);
+    final JaegerSpan pendingChild = mockSpan(10, 1, 1);
+    pendingOnThisSpan.add(pendingChild);
+    final List<JaegerSpan> pendingOnParentSpan = new ArrayList<>(1);
+    final JaegerSpan pending = mockSpan(20, 1, 1);
+    pendingOnParentSpan.add(pending);
+
+    // When:
+    final List<JaegerSpan> spans = FilteringReporter.setOrUpdateParentsPendingSpans(hasPendingChildren,
+        pendingOnThisSpan, pendingOnParentSpan);
+
+    // Then:
+    assertEquals("Existing list not reused", pendingOnParentSpan, spans);
+    assertEquals("Pending span not found", pending, spans.get(0));
+    assertEquals("Pending child not copied over", pendingChild, spans.get(1));
   }
 
   private JaegerSpan mockSpan(long spanId, long duration) {

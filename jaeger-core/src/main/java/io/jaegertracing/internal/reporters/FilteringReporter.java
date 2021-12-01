@@ -83,26 +83,36 @@ public class FilteringReporter implements Reporter {
     final boolean hasParent = parentId != 0;
     final boolean hasPendingChildren = pendingChildren != null;
     if (hasParent) {
+      // Defer this span along with any already pending children:
+      pendingByParent.compute(parentId, (id, spans) ->
+        setOrUpdateParentsPendingSpans(hasPendingChildren, pendingChildren, spans)).add(span);
       pendingCount.increment();
       metrics.deferredSpansPending.update(pendingCount.longValue());
       metrics.deferredSpansStarted.inc(1);
-      pendingByParent.compute(parentId, (id, spans) -> {
-        if (spans == null) {
-          spans = hasPendingChildren ? pendingChildren : new ArrayList<>(1);
-        } else if (hasPendingChildren) {
-          spans.addAll(pendingChildren);
-        }
-        spans.add(span);
-        return spans;
-      });
     } else if (hasPendingChildren) {
-      // The current span does not meet the criteria so all the previously pending children spans need to be
-      // marked as dropped.
+      // The current span is a top-level span that does not meet the criteria so all the previously pending
+      // children need to be marked as dropped:
       final int count = pendingChildren.size();
       pendingCount.add(-1 * count);
       metrics.deferredSpansPending.update(pendingCount.longValue());
       metrics.deferredSpansDropped.inc(count);
     }
+  }
+
+  /**
+   * Returns the collection for spans pending on the parent span. The current span will be added to this
+   * collection by the caller while any previously pending spans are migrated by this method.
+   */
+  static List<JaegerSpan> setOrUpdateParentsPendingSpans(final boolean hasPendingChildren,
+      final List<JaegerSpan> pendingOnThisSpan, List<JaegerSpan> pendingOnParentSpan) {
+    if (pendingOnParentSpan == null) {
+      // First sibling to be deferred, either promote pending children collection or create a new collection:
+      pendingOnParentSpan = hasPendingChildren ? pendingOnThisSpan : new ArrayList<>(1);
+    } else if (hasPendingChildren) {
+      // Collection already created by a sibling, copy over this span's pending children:
+      pendingOnParentSpan.addAll(pendingOnThisSpan);
+    }
+    return pendingOnParentSpan;
   }
 
   @Override
