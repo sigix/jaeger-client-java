@@ -80,24 +80,24 @@ public class FilteringReporter implements Reporter {
   private void defer(final JaegerSpan span, final JaegerSpanContext context,
       final List<JaegerSpan> pendingChildren) {
     final long parentId = context.getParentId();
-    if (parentId != 0) {
+    final boolean hasParent = parentId != 0;
+    final boolean hasPendingChildren = pendingChildren != null;
+    if (hasParent) {
       pendingCount.increment();
       metrics.deferredSpansPending.update(pendingCount.longValue());
       metrics.deferredSpansStarted.inc(1);
       pendingByParent.compute(parentId, (id, spans) -> {
         if (spans == null) {
-          if (pendingChildren == null) {
-            spans = new ArrayList<>(1);
-          } else {
-            spans = pendingChildren;
-          }
-        } else if (pendingChildren != null) {
+          spans = hasPendingChildren ? pendingChildren : new ArrayList<>(1);
+        } else if (hasPendingChildren) {
           spans.addAll(pendingChildren);
         }
         spans.add(span);
         return spans;
       });
-    } else if (pendingChildren != null) {
+    } else if (hasPendingChildren) {
+      // The current span does not meet the criteria so all the previously pending children spans need to be
+      // marked as dropped.
       final int count = pendingChildren.size();
       pendingCount.add(-1 * count);
       metrics.deferredSpansPending.update(pendingCount.longValue());
