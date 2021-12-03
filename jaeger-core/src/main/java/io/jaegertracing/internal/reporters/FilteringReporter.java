@@ -27,8 +27,13 @@ import lombok.ToString;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * FilteringReporter drops spans below a specific threshold and buffers the remaining spans in memory and
- * sends them to a delegate only once a parent span exceeds a specified threshold.
+ * FilteringReporter drops spans below a filtering threshold and buffers spans below a deferring threshold
+ * until a parent span exceeds that threshold.
+ */
+
+/**
+ * FilteringReporter drops spans below a filtering threshold and potentially buffers the remaining spans in
+ * memory, sending them to a delegate only once a parent span exceeds a deferring threshold.
  */
 @ToString
 @Slf4j
@@ -100,16 +105,19 @@ public class FilteringReporter implements Reporter {
   }
 
   /**
-   * Returns the collection for spans pending on the parent span. The current span will be added to this
-   * collection by the caller while any previously pending spans are migrated by this method.
+   * This is the mapping function used to update the pendingByParent map. It returns the list to be used
+   * for all spans pending on a parent span. The current span will be added to this collection by the caller
+   * while any spans that were previously pending on the current span are migrated by this method.
    */
   static List<JaegerSpan> setOrUpdateParentsPendingSpans(final boolean hasPendingChildren,
-      final List<JaegerSpan> pendingOnThisSpan, List<JaegerSpan> pendingOnParentSpan) {
+      final List<JaegerSpan> pendingOnThisSpan,
+      final List<JaegerSpan> pendingOnParentSpan) {  // visible for testing
     if (pendingOnParentSpan == null) {
-      // First sibling to be deferred, either promote pending children collection or create a new collection:
-      pendingOnParentSpan = hasPendingChildren ? pendingOnThisSpan : new ArrayList<>(1);
-    } else if (hasPendingChildren) {
-      // Collection already created by a sibling, copy over this span's pending children:
+      // First sibling to be deferred, either promote the existing pending children list or create a new list:
+      return hasPendingChildren ? pendingOnThisSpan : new ArrayList<>(1);
+    }
+    // A list has already been created by a sibling. Copy over this span's pending children if any:
+    if (hasPendingChildren) {
       pendingOnParentSpan.addAll(pendingOnThisSpan);
     }
     return pendingOnParentSpan;
